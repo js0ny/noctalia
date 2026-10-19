@@ -9,6 +9,12 @@
 
 class TaskbarWidgetTestAccess {
 public:
+  static std::string workspaceLabel(
+      const Workspace& workspace, std::string_view displayKey, TaskbarLabelSource source, std::size_t index = 0
+  ) {
+    return TaskbarWidget::workspaceGroupLabel(workspace, index, displayKey, source);
+  }
+
   static std::pair<bool, bool>
   compare(std::uintptr_t previousHandle, std::uintptr_t nextHandle, std::string previousTitle, std::string nextTitle) {
     const TaskbarWidget::TaskModel previous{
@@ -114,6 +120,23 @@ public:
 };
 
 int main() {
+  const Workspace namedWorkspace{.id = "42", .name = "10-project", .index = 10};
+  TEST_CHECK(TaskbarWidgetTestAccess::workspaceLabel(namedWorkspace, "10-project", TaskbarLabelSource::Id) == "10");
+  TEST_CHECK(
+      TaskbarWidgetTestAccess::workspaceLabel(namedWorkspace, "10-project", TaskbarLabelSource::Name) == "10-project"
+  );
+  TEST_CHECK(TaskbarWidgetTestAccess::workspaceLabel(Workspace{.index = 6}, "6", TaskbarLabelSource::Name) == "6");
+  TEST_CHECK(
+      TaskbarWidgetTestAccess::workspaceLabel(
+          Workspace{.id = "12", .name = "project"}, "project", TaskbarLabelSource::Id
+      )
+      == "12"
+  );
+  TEST_CHECK(TaskbarWidgetTestAccess::workspaceLabel({}, "", TaskbarLabelSource::Id, 2) == "3");
+  TEST_CHECK(
+      TaskbarWidgetTestAccess::workspaceLabel(Workspace{.name = "project"}, "", TaskbarLabelSource::Name) == "project"
+  );
+
   // Title changes are patched into retained labels and tooltips, never treated as structural.
   TEST_CHECK(TaskbarWidgetTestAccess::compare(11, 11, "old", "new") == std::pair(true, true));
   TEST_CHECK(TaskbarWidgetTestAccess::compare(11, 11, "same", "same") == std::pair(true, false));
