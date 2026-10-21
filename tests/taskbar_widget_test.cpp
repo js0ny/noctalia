@@ -137,6 +137,21 @@ int main() {
       TaskbarWidgetTestAccess::workspaceLabel(Workspace{.name = "project"}, "", TaskbarLabelSource::Name) == "project"
   );
 
+  const Workspace kdeWorkspace{
+      .id = "42b3940c-7656-4c29-bf76-98f534b42472",
+      .name = "10-project",
+      .index = 3,
+  };
+  TEST_CHECK(TaskbarWidgetTestAccess::workspaceLabel(kdeWorkspace, "", TaskbarLabelSource::Name) == "10-project");
+  TEST_CHECK(TaskbarWidgetTestAccess::workspaceLabel(kdeWorkspace, "", TaskbarLabelSource::Id) == "3");
+  TEST_CHECK(
+      TaskbarWidgetTestAccess::workspaceLabel(
+          Workspace{.id = "a2b3940c-7656-4c29-bf76-98f534b42472", .name = "project", .index = 3}, "",
+          TaskbarLabelSource::Name
+      )
+      == "project"
+  );
+
   // Title changes are patched into retained labels and tooltips, never treated as structural.
   TEST_CHECK(TaskbarWidgetTestAccess::compare(11, 11, "old", "new") == std::pair(true, true));
   TEST_CHECK(TaskbarWidgetTestAccess::compare(11, 11, "same", "same") == std::pair(true, false));
