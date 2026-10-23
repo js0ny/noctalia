@@ -357,14 +357,10 @@ void Application::retrySecretServiceConsumers(bool defaultCollectionUnlocked) {
   }
   // A locked storage key is only worth reopening once the collection is actually unlocked: a lookup
   // then reads silently, whereas retrying while still locked would raise a second keyring prompt.
-  // Some providers (seen with a passwordless KWallet) answer a lookup made while the wallet is still
-  // opening with a malformed secret instead of an error, which surfaces as BackendError.
   const security::StorageKeyState storageKeyState = m_storageKeyProvider.state();
   if (!m_storageKeyAutoRetried
       && (storageKeyState == security::StorageKeyState::Unavailable
-          || ((storageKeyState == security::StorageKeyState::DeniedOrLocked
-               || storageKeyState == security::StorageKeyState::BackendError)
-              && defaultCollectionUnlocked))) {
+          || (storageKeyState == security::StorageKeyState::DeniedOrLocked && defaultCollectionUnlocked))) {
     m_storageKeyAutoRetried = true;
     kLog.info("secret service is running; reopening encrypted storage");
     DeferredCall::callLater([this]() { m_storageKeyProvider.retry(); });
@@ -718,6 +714,21 @@ void Application::initStyleThemeAndWayland() {
   // Let a plugin toggle one of its own panels.
   m_scriptApi.setTogglePanelHook([this](const std::string& panelId) { m_panelManager.togglePanel(panelId); });
 
+  m_scriptApi.setIdleWatchHook([this](
+                                   std::uint64_t hostId, int watchId, std::uint32_t timeoutMs, bool ignoreInhibitors,
+                                   scripting::ScriptApiContext::IdleWatchDelivery delivery
+                               ) {
+    m_pluginIdleWatches.watch(hostId, watchId, timeoutMs, ignoreInhibitors, std::move(delivery));
+  });
+  m_scriptApi.setIdleUnwatchHook([this](std::uint64_t hostId, int watchId) {
+    m_pluginIdleWatches.unwatch(hostId, watchId);
+  });
+  m_scriptApi.setReleaseIdleWatchesHook([this](std::uint64_t hostId) { m_pluginIdleWatches.release(hostId); });
+  m_scriptApi.setLayerCommandHook([this](
+                                      scripting::PluginLayerCommand command, const std::string& entryId,
+                                      const scripting::PluginLayerConfigPatch& patch
+                                  ) { m_pluginLayerHost.command(command, entryId, patch); });
+
   m_scriptApi.setOpenPluginSettingsHook([this](const std::string& pluginId) {
     if (!m_panelManager.openPluginSettings(pluginId)) {
       kLog.warn("plugin openSettings ignored: \"{}\" has no settings", pluginId);
@@ -865,6 +876,7 @@ void Application::reconcileOutputSurfaces() {
   m_notificationToast.onOutputChange();
   m_osdOverlay.onOutputChange();
   m_windowSwitcher.onOutputChange();
+  m_pluginLayerHost.onOutputChange();
 }
 
 void Application::initWaylandCallbacks() {
@@ -1650,7 +1662,41 @@ void Application::initSessionBusServices() {
 
   m_locationService.initialize();
   m_weatherService.initialize();
+
+  // Mirror the calendar snapshot into the script API so plugins can read it through
+  // noctalia.calendarEvents(). Same pattern as the clipboard text mirror: converted once per sync on
+  // the main thread, then read race-free from plugin states. Registered before initialize() so the
+  // first sync is not missed.
+  auto pushCalendar = [this]() {
+    const CalendarSnapshot& snapshot = m_calendarService.snapshot();
+    if (!snapshot.valid) {
+      m_scriptApi.setCalendarEvents(nullptr);
+      return;
+    }
+    std::vector<scripting::ScriptCalendarEvent> events;
+    events.reserve(snapshot.events.size());
+    for (const CalendarEvent& event : snapshot.events) {
+      events.push_back(
+          scripting::ScriptCalendarEvent{
+              .id = event.id,
+              .title = event.title,
+              .calendarName = event.calendarName,
+              .colorHex = event.colorHex,
+              .location = event.location,
+              .url = event.url,
+              .startMs = std::chrono::duration<double, std::milli>(event.start.time_since_epoch()).count(),
+              .endMs = std::chrono::duration<double, std::milli>(event.end.time_since_epoch()).count(),
+              .allDay = event.allDay,
+          }
+      );
+    }
+    m_scriptApi.setCalendarEvents(
+        std::make_shared<const std::vector<scripting::ScriptCalendarEvent>>(std::move(events))
+    );
+  };
+  (void)m_calendarService.addChangeCallback(pushCalendar);
   m_calendarService.initialize();
+  pushCalendar();
 
   // Load the persisted fired set before the first evaluation, or a restart would re-notify.
   m_calendarReminderMonitor.initialize();

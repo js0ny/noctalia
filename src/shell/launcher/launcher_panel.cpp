@@ -930,8 +930,9 @@ public:
     return (*m_results)[index].origin;
   }
 
-  [[nodiscard]] std::optional<TooltipAnchorInsets>
-  itemTooltipAnchorInsets(std::size_t index, float cellWidth, float cellHeight) const override {
+  [[nodiscard]] std::optional<TooltipAnchorInsets> itemTooltipAnchorInsets(
+      std::size_t index, float cellWidth, float cellHeight, bool /*overlayHovered*/
+  ) const override {
     if (m_results == nullptr || index >= m_results->size() || (*m_results)[index].originGlyph.empty()) {
       return std::nullopt;
     }
@@ -1081,8 +1082,9 @@ public:
     return (*m_results)[index].origin;
   }
 
-  [[nodiscard]] std::optional<TooltipAnchorInsets>
-  itemTooltipAnchorInsets(std::size_t index, float cellWidth, float cellHeight) const override {
+  [[nodiscard]] std::optional<TooltipAnchorInsets> itemTooltipAnchorInsets(
+      std::size_t index, float cellWidth, float cellHeight, bool /*overlayHovered*/
+  ) const override {
     if (m_results == nullptr || index >= m_results->size() || (*m_results)[index].originGlyph.empty()) {
       return std::nullopt;
     }
@@ -2502,7 +2504,6 @@ void LauncherPanel::onInputChanged(const std::string& text) {
     const auto allSlot = std::ranges::find(m_categoryFilterSlots, All, &CategoryFilterSlot::type);
     m_activeCategorySlotIndex =
         allSlot == m_categoryFilterSlots.end() ? 0 : static_cast<std::size_t>(allSlot - m_categoryFilterSlots.begin());
-    m_activeCategory.clear();
   }
   m_allResults.clear();
 
@@ -2842,6 +2843,7 @@ void LauncherPanel::rebuildCategoryFilter() {
     return;
   }
 
+  m_categoryFilter->setOnChange({});
   m_categoryFilter->clearOptions();
   const bool categoryIconsOnly = m_config != nullptr && m_config->config().shell.launcher.categoryIconsOnly;
   if (m_browserMode) {
@@ -3015,7 +3017,7 @@ void LauncherPanel::setActiveCategorySlot(std::size_t slotIndex) {
     ) {
       m_activeCategory = m_currentCategories.front().label;
     }
-  } else {
+  } else if (!m_browserMode) {
     m_activeCategory.clear();
   }
   if (!m_browserMode && m_categoryFilter != nullptr && m_categoryFilter->selectedIndex() != slotIndex) {

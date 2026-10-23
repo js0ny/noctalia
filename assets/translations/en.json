@@ -1309,6 +1309,8 @@
       "merged-user-description": "Combines config files and GUI overrides into one TOML file. Built-in defaults stay implicit.",
       "merged-user-save-title": "Save Merged User Config",
       "merged-user-title": "Merged User Config (Recommended)",
+      "privacy-warning-description": "Both export modes may include API keys, passwords, or other sensitive data stored in your config, including by plugins. Treat exported files as private. Review and remove sensitive data before sharing.",
+      "privacy-warning-title": "Exports may contain secrets",
       "title": "Export Config"
     },
     "idle": {
@@ -3330,6 +3332,10 @@
           "description": "Show an OSD popup when the caffeine (idle inhibitor) state changes",
           "label": "Caffeine"
         },
+        "osd-kinds-custom": {
+          "description": "Show custom OSD popups sent by plugins or scripts",
+          "label": "Custom"
+        },
         "osd-kinds-dnd": {
           "description": "Show an OSD popup when Do Not Disturb is toggled",
           "label": "Do Not Disturb"
@@ -3711,6 +3717,8 @@
       "success": "Private storage was reset successfully."
     },
     "templates": {
+      "documentation": "Documentation",
+      "readme": "Readme",
       "store": {
         "browse": "Browse Templates",
         "categories": "Categories",
@@ -4012,6 +4020,10 @@
             "description": "Enable OSD popups",
             "label": "Enable OSD"
           },
+          "osd-show": {
+            "description": "Show a custom OSD popup",
+            "label": "Show custom OSD"
+          },
           "osd-toggle": {
             "description": "Toggle OSD popups",
             "label": "Toggle OSD"
@@ -4055,6 +4067,10 @@
           "screenshot-region": {
             "description": "Start an interactive region screenshot",
             "label": "Region screenshot"
+          },
+          "screenshot-window": {
+            "description": "Capture the focused window",
+            "label": "Window screenshot"
           },
           "session": {
             "description": "Run a built-in session action",
