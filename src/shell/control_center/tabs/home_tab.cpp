@@ -146,14 +146,22 @@ namespace {
     if (hovered) {
       card.setBorder(colorSpecFromRole(ColorRole::Hover), Style::borderWidth);
     } else if (Style::cardBordersEnabled()) {
-      card.setBorder(colorSpecFromRole(ColorRole::Outline), Style::borderWidth);
+      card.setBorder(colorSpecFromRole(ColorRole::OutlineVariant), Style::borderWidth);
     } else {
       card.clearBorder();
     }
   }
 
-  void applyAvatarChrome(Image* avatar, bool highlighted) {
+  bool avatarBorderEnabled(const ConfigService* config) {
+    return config == nullptr || config->config().controlCenter.showAvatarBorder;
+  }
+
+  void applyAvatarChrome(Image* avatar, bool highlighted, bool showBorder) {
     if (avatar == nullptr) {
+      return;
+    }
+    if (!showBorder) {
+      avatar->setBorder(colorSpecFromRole(ColorRole::Primary), 0.0F);
       return;
     }
     const float borderWidth = Style::borderWidth * 3.0F;
@@ -248,6 +256,8 @@ std::unique_ptr<Flex> HomeTab::create() {
 
   const float avatarSize = homeAvatarSize(scale);
   const bool circularAvatar = m_config == nullptr || m_config->config().controlCenter.circularAvatar;
+  m_avatarBorderShown = avatarBorderEnabled(m_config);
+  const bool showAvatarBorder = m_avatarBorderShown;
   const auto openAvatarPicker = [this]() {
     if (m_config == nullptr) {
       return;
@@ -299,23 +309,17 @@ std::unique_ptr<Flex> HomeTab::create() {
           .padding = 1.0F * scale,
           .width = avatarSize,
           .height = avatarSize,
-          .configure = [](Image& image) {
-            image.setBorder(colorSpecFromRole(ColorRole::Primary), Style::borderWidth * 3.0F);
+          .configure = [showAvatarBorder](Image& image) {
+            applyAvatarChrome(&image, false, showAvatarBorder);
             image.setHitTestVisible(false);
             image.setAsyncReadyCallback([]() { PanelManager::instance().refresh(); });
           },
       })
   );
-  const auto syncAvatarChrome = [this]() {
-    const bool highlighted =
-        m_userAvatarArea != nullptr && (m_userAvatarArea->focused() || m_userAvatarArea->hovered());
-    applyAvatarChrome(m_userAvatar, highlighted);
-    PanelManager::instance().requestRedraw();
-  };
-  avatarArea->setOnEnter([syncAvatarChrome](const InputArea::PointerData&) { syncAvatarChrome(); });
-  avatarArea->setOnLeave([syncAvatarChrome]() { syncAvatarChrome(); });
-  avatarArea->setOnFocusGain(syncAvatarChrome);
-  avatarArea->setOnFocusLoss(syncAvatarChrome);
+  avatarArea->setOnEnter([this](const InputArea::PointerData&) { syncAvatarChrome(); });
+  avatarArea->setOnLeave([this]() { syncAvatarChrome(); });
+  avatarArea->setOnFocusGain([this]() { syncAvatarChrome(); });
+  avatarArea->setOnFocusLoss([this]() { syncAvatarChrome(); });
   const auto configureUserDetailLabel = [scale](Label& label) {
     label.setShadow(colorSpecFromRole(ColorRole::Shadow, 0.36F), 0.0F, 1.0F * scale);
   };
@@ -1090,7 +1094,7 @@ void HomeTab::syncUserCardFill() {
     m_userCard->clearFill();
     return;
   }
-  m_userCard->setFill(colorSpecFromRole(ColorRole::SurfaceVariant, panelCardOpacity()));
+  m_userCard->setFill(colorSpecFromRole(ColorRole::SurfaceContainer, panelCardOpacity()));
 }
 
 void HomeTab::syncWallpaperLayerVisibility() {
@@ -1233,8 +1237,18 @@ void HomeTab::syncHeaderActions() {
   }
 }
 
+void HomeTab::syncAvatarChrome() {
+  m_avatarBorderShown = avatarBorderEnabled(m_config);
+  const bool highlighted = m_userAvatarArea != nullptr && (m_userAvatarArea->focused() || m_userAvatarArea->hovered());
+  applyAvatarChrome(m_userAvatar, highlighted, m_avatarBorderShown);
+  PanelManager::instance().requestRedraw();
+}
+
 void HomeTab::doUpdate(Renderer& renderer) {
   syncHeaderActions();
+  if (m_avatarBorderShown != avatarBorderEnabled(m_config)) {
+    syncAvatarChrome();
+  }
   if (!m_active) {
     m_progressTimer.stop();
     return;
